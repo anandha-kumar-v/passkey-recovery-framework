@@ -135,6 +135,23 @@ Open **http://localhost:5000**. Use `localhost` and not a LAN IP, because WebCry
 2. **Login:** use the same email and User ID, in the same browser where you signed up.
 3. **Recover:** request an OTP, then enter it with your original password to restore the key on the current browser.
 
+## To Delete the Device Private Key
+
+1. Open Console
+2. Paste the Code
+```
+async function forceDeleteAllKeys() {
+  const db  = await openDB();
+  const tx  = db.transaction('keys', 'readwrite');
+  tx.objectStore('keys').clear();
+  await new Promise((res, rej) => {
+    tx.oncomplete = () => { console.log('✅ All keys deleted!'); res(); }
+    tx.onerror    = rej;
+  });
+}
+forceDeleteAllKeys();
+```
+
 ## API reference
 
 | Method | Endpoint | Purpose |
