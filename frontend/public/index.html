@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Passkey Recovery Framework</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:      #f0f4ff;
+  --surface: #e8eeff;
+  --card:    #ffffff;
+  --border:  #c7d2fe;
+  --border2: #a5b4fc;
+  --cyan:    #4f46e5;
+  --violet:  #6366f1;
+  --green:   #059669;
+  --red:     #dc2626;
+  --amber:   #d97706;
+  --text:    #1e1b4b;
+  --muted:   #6b7280;
+  --muted2:  #4b5563;
+  --font-h:  'Orbitron', monospace;
+  --font-b:  'Inter', sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font-b);
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow-x:hidden;
+}
+
+/* Animated background */
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 40%, rgba(79,70,229,.08) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 70%, rgba(99,102,241,.08) 0%, transparent 60%),
+    linear-gradient(rgba(79,70,229,.04) 1px, transparent 1px) 0 0 / 48px 48px,
+    linear-gradient(90deg, rgba(79,70,229,.04) 1px, transparent 1px) 0 0 / 48px 48px;
+  pointer-events:none;
+  z-index:0;
+}
+
+.app{width:100%;max-width:480px;padding:16px;position:relative;z-index:1}
+
+/* ── Screens ── */
+.screen{display:none;animation:rise .4s cubic-bezier(.22,1,.36,1)}
+.screen.active{display:block}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+/* ── Card ── */
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:40px 36px;
+  position:relative;
+  overflow:hidden;
+  box-shadow:0 4px 32px rgba(79,70,229,.10), 0 1px 4px rgba(79,70,229,.06);
+}
+.card-glow{
+  position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--cyan),var(--violet),transparent);
+}
+
+/* ── Logo/Header ── */
+.logo-wrap{text-align:center;margin-bottom:36px}
+.logo-icon{
+  font-size:48px;
+  display:inline-block;
+  margin-bottom:16px;
+  filter:drop-shadow(0 0 16px rgba(79,70,229,.4));
+  animation:pulse 3s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{filter:drop-shadow(0 0 16px rgba(79,70,229,.4))}50%{filter:drop-shadow(0 0 28px rgba(99,102,241,.6))}}
+.logo-title{
+  font-family:var(--font-h);
+  font-size:18px;
+  font-weight:700;
+  letter-spacing:3px;
+  color:var(--cyan);
+  text-transform:uppercase;
+}
+.logo-sub{font-size:11px;color:var(--muted);letter-spacing:2px;margin-top:6px;text-transform:uppercase}
+
+/* ── Screen title ── */
+.stitle{
+  font-family:var(--font-h);
+  font-size:14px;
+  font-weight:700;
+  letter-spacing:2px;
+  color:var(--cyan);
+  text-transform:uppercase;
+  margin-bottom:28px;
+  display:flex;align-items:center;gap:10px;
+}
+.stitle-icon{
+  width:32px;height:32px;border-radius:8px;
+  background:rgba(79,70,229,.1);border:1px solid rgba(79,70,229,.2);
+  display:flex;align-items:center;justify-content:center;font-size:15px;
+}
+
+/* ── Buttons ── */
+.btn-group{display:flex;flex-direction:column;gap:12px;margin-top:4px}
+.btn{
+  width:100%;padding:14px 20px;
+  border:none;border-radius:12px;
+  font-family:var(--font-b);font-size:14px;font-weight:600;
+  letter-spacing:.5px;cursor:pointer;
+  transition:all .2s;position:relative;overflow:hidden;
+}
+.btn::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(rgba(255,255,255,.10),transparent);
+}
+.btn-cyan{background:linear-gradient(135deg,#3730a3,var(--cyan));color:#fff}
+.btn-cyan:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(79,70,229,.25)}
+.btn-violet{background:linear-gradient(135deg,#4338ca,var(--violet));color:#fff}
+.btn-violet:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(99,102,241,.25)}
+.btn-green{background:linear-gradient(135deg,#047857,var(--green));color:#fff}
+.btn-green:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(5,150,105,.25)}
+.btn-outline{
+  background:transparent;border:1px solid var(--border2);color:var(--muted2);
+}
+.btn-outline:hover{border-color:var(--cyan);color:var(--cyan)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none !important;box-shadow:none !important}
+
+/* ── Back button ── */
+.back{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:12px;color:var(--muted);cursor:pointer;
+  margin-bottom:24px;background:none;border:none;font-family:var(--font-b);
+  transition:color .2s;padding:0;
+}
+.back:hover{color:var(--cyan)}
+
+/* ── Form ── */
+.fgroup{margin-bottom:16px}
+.flabel{
+  display:block;font-size:11px;font-weight:600;
+  letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:8px;
+}
+input{
+  width:100%;padding:13px 16px;
+  background:#f5f7ff;
+  border:1px solid var(--border);border-radius:10px;
+  color:var(--text);font-family:var(--font-b);font-size:14px;
+  outline:none;transition:all .2s;
+}
+input:focus{border-color:var(--cyan);background:#eef1ff;box-shadow:0 0 0 3px rgba(79,70,229,.10)}
+input::placeholder{color:#a0aec0}
+input[readonly]{opacity:.6;cursor:default}
+
+/* ── Divider ── */
+.divider{
+  height:1px;background:var(--border);
+  margin:20px 0;position:relative;
+}
+
+/* ── Msg / Status ── */
+.msg-box{margin-top:14px}
+.status{
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:12px;font-weight:500;padding:8px 14px;
+  border-radius:8px;letter-spacing:.3px;
+}
+.status.ok  {background:rgba(5,150,105,.08);color:var(--green);border:1px solid rgba(5,150,105,.2)}
+.status.err {background:rgba(220,38,38,.08);color:var(--red);border:1px solid rgba(220,38,38,.2)}
+.status.info{background:rgba(79,70,229,.08);color:var(--cyan);border:1px solid rgba(79,70,229,.2)}
+.status.warn{background:rgba(217,119,6,.08);color:var(--amber);border:1px solid rgba(217,119,6,.2)}
+
+/* ── Loader ── */
+.loader{display:none;align-items:center;gap:10px;font-size:12px;color:var(--muted);margin-top:14px}
+.loader.show{display:flex}
+.spin{
+  width:16px;height:16px;border-radius:50%;
+  border:2px solid var(--border2);border-top-color:var(--cyan);
+  animation:spin .6s linear infinite;flex-shrink:0;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Step progress ── */
+.steps{display:flex;justify-content:space-between;margin-bottom:28px;position:relative}
+.steps::before{
+  content:'';position:absolute;
+  top:13px;left:24px;right:24px;height:2px;
+  background:var(--border);z-index:0;
+}
+.step{
+  position:relative;display:flex;flex-direction:column;
+  align-items:center;gap:6px;font-size:10px;
+  color:var(--muted);letter-spacing:1px;text-transform:uppercase;
+  flex:1;z-index:1;
+}
+.sdot{
+  width:26px;height:26px;border-radius:50%;
+  background:var(--card);border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;transition:all .3s;
+}
+.step.active .sdot{border-color:var(--cyan);color:var(--cyan);background:rgba(79,70,229,.08);box-shadow:0 0 10px rgba(79,70,229,.2)}
+.step.done   .sdot{border-color:var(--green);background:var(--green);color:#fff}
+.step.active{color:var(--cyan)}
+.step.done{color:var(--green)}
+
+/* ── Fragment cards ── */
+.frag-list{display:flex;flex-direction:column;gap:8px;margin:16px 0}
+.frag-card{
+  background:rgba(79,70,229,.04);
+  border:1px solid rgba(79,70,229,.12);
+  border-radius:10px;padding:12px 14px;
+  display:flex;align-items:flex-start;gap:12px;
+}
+.frag-num{
+  font-family:var(--font-h);font-size:10px;
+  color:var(--cyan);min-width:52px;padding-top:1px;
+}
+.frag-val{
+  font-size:11px;color:var(--muted);
+  word-break:break-all;line-height:1.5;font-family:monospace;
+}
+
+/* ── Dashboard ── */
+.dash-header{
+  text-align:center;padding:20px 0 28px;
+}
+.dash-avatar{
+  width:64px;height:64px;border-radius:50%;
+  background:linear-gradient(135deg,rgba(79,70,229,.15),rgba(99,102,241,.15));
+  border:2px solid rgba(79,70,229,.25);
+  display:flex;align-items:center;justify-content:center;
+  font-size:28px;margin:0 auto 14px;
+}
+.dash-uid{font-family:var(--font-h);font-size:13px;color:var(--cyan);letter-spacing:2px}
+.dash-email{font-size:12px;color:var(--muted);margin-top:4px}
+.dash-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:20px 0}
+.dash-card{
+  background:#f5f7ff;border:1px solid var(--border);
+  border-radius:12px;padding:16px;text-align:center;
+}
+.dash-card-icon{font-size:22px;margin-bottom:8px}
+.dash-card-label{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+.dash-card-val{font-size:13px;font-weight:600;color:var(--green);margin-top:4px}
+
+/* ── Recovered key ── */
+.rec-key{
+  background:rgba(5,150,105,.04);border:1px solid rgba(5,150,105,.15);
+  border-radius:10px;padding:14px;margin:14px 0;
+  font-family:monospace;font-size:11px;color:#065f46;
+  word-break:break-all;line-height:1.6;max-height:150px;overflow-y:auto;
+}
+
+.hint{font-size:12px;color:var(--muted);text-align:center;margin-top:14px}
+.hint a{color:var(--cyan);cursor:pointer;background:none;border:none;font-family:var(--font-b);font-size:12px}
+.hint a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN: HOME
+══════════════════════════════════════════════════ -->
+<div class="screen active" id="s-home">
+<div class="card">
+  <div class="card-glow"></div>
+  <div class="logo-wrap">
+    <div class="logo-icon">🔐</div>
+    <div class="logo-title">Passkey Recovery</div>
+    <div class="logo-sub">Decentralized Key Management Framework</div>
+  </div>
+  <div class="btn-group">
+    <button class="btn btn-cyan"   onclick="go('s-login')">⬡ &nbsp;Login</button>
+    <button class="btn btn-violet" onclick="go('s-signup-email')">✦ &nbsp;Sign Up</button>
+    <button class="btn btn-outline" onclick="go('s-recovery-init')">🛡 &nbsp;Recover Key</button>
+  </div>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN: SIGNUP — Step 1: Email + OTP
+══════════════════════════════════════════════════ -->
+<div class="screen" id="s-signup-email">
+<div class="card">
+  <div class="card-glow"></div>
+  <button class="back" onclick="go('s-home')">← Back</button>
+  <div class="stitle"><div class="stitle-icon">✦</div>Sign Up</div>
+
+  <div class="steps">
+    <div class="step active" id="su-s1"><div class="sdot">1</div>Email</div>
+    <div class="step"        id="su-s2"><div class="sdot">2</div>Verify</div>
+    <div class="step"        id="su-s3"><div class="sdot">3</div>Setup</div>
+    <div class="step"        id="su-s4"><div class="sdot">4</div>Done</div>
+  </div>
+
+  <div class="fgroup">
+    <label class="flabel">Email Address</label>
+    <input type="email" id="su-email" placeholder="you@example.com"/>
+  </div>
+  <button class="btn btn-violet" onclick="doSignupInit()">Send OTP →</button>
+  <div class="loader" id="ld-su-init"><div class="spin"></div>Sending OTP to email…</div>
+  <div class="msg-box" id="msg-su-init"></div>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN: SIGNUP — Step 2: OTP Verify
+══════════════════════════════════════════════════ -->
+<div class="screen" id="s-signup-otp">
+<div class="card">
+  <div class="card-glow"></div>
+  <div class="stitle"><div class="stitle-icon">✉</div>Verify Email</div>
+
+  <div class="steps">
+    <div class="step done"   id="su2-s1"><div class="sdot">✓</div>Email</div>
+    <div class="step active" id="su2-s2"><div class="sdot">2</div>Verify</div>
+    <div class="step"        id="su2-s3"><div class="sdot">3</div>Setup</div>
+    <div class="step"        id="su2-s4"><div class="sdot">4</div>Done</div>
+  </div>
+
+  <p style="font-size:13px;color:var(--muted);margin-bottom:20px">OTP sent to your email. Enter it below.</p>
+  <div class="fgroup">
+    <label class="flabel">OTP Code</label>
+    <input type="text" id="su-otp" placeholder="6-digit OTP" maxlength="6"/>
+  </div>
+  <button class="btn btn-violet" onclick="doSignupVerifyOTP()">Verify OTP →</button>
+  <div class="loader" id="ld-su-otp"><div class="spin"></div>Verifying…</div>
+  <div class="msg-box" id="msg-su-otp"></div>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN: SIGNUP — Step 3: ID + Password + Generate
+══════════════════════════════════════════════════ -->
+<div class="screen" id="s-signup-setup">
+<div class="card">
+  <div class="card-glow"></div>
+  <div class="stitle"><div class="stitle-icon">🔑</div>Setup Passkey</div>
+
+  <div class="steps">
+    <div class="step done"   id="su3-s1"><div class="sdot">✓</div>Email</div>
+    <div class="step done"   id="su3-s2"><div class="sdot">✓</div>Verify</div>
+    <div class="step active" id="su3-s3"><div class="sdot">3</div>Setup</div>
+    <div class="step"        id="su3-s4"><div class="sdot">4</div>Done</div>
+  </div>
+
+  <div class="fgroup">
+    <label class="flabel">Unique User ID</label>
+    <input type="text" id="su-uid" placeholder="choose_your_unique_id"/>
+  </div>
+  <div class="fgroup">
+    <label class="flabel">Password (used for AES key — never stored in server)</label>
+    <input type="password" id="su-pass" placeholder="strong password"/>
+  </div>
+  <div class="fgroup">
+    <label class="flabel">Confirm Password</label>
+    <input type="password" id="su-pass2" placeholder="confirm password"/>
+  </div>
+  <button class="btn btn-violet" onclick="doSignupComplete()">Generate Passkey 🚀</button>
+  <div class="loader" id="ld-su-setup"><div class="spin"></div><span id="su-status">Generating RSA keypair…</span></div>
+  <div class="msg-box" id="msg-su-setup"></div>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN: SIGNUP — Step 4: Done
+══════════════════════════════════════════════════ -->
+<div class="screen" id="s-signup-done">
+<div class="card">
+  <div class="card-glow"></div>
+  <div class="stitle"><div class="stitle-icon">✅</div>Passkey Created</div>
+
+  <div class="steps">
+    <div class="step done"><div class="sdot">✓</div>Email</div>
+    <div class="step done"><div class="sdot">✓</div>Verify</div>
+    <div class="step done"><div class="sdot">✓</div>Setup</div>
+    <div class="step done"><div class="sdot">✓</div>Done</div>
+  </div>
+
+  <div style="text-align:center;margin:16px 0">
+    <div style="font-size:48px;margin-bottom:12px;filter:drop-shadow(0 0 20px rgba(5,150,105,.4))">🎉</div>
+    <div style="font-size:14px;color:var(--green);font-weight:600">Passkey Generated Successfully!</div>
+  </div>
+
+  <div class="frag-list" id="done-frags"></div>
+
+  <div class="divider"></div>
+  <button class="btn btn-cyan" onclick="go('s-login')">Go to Login →</button>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN: LOGIN — Step 1: Email + User ID
+══════════════════════════════════════════════════ -->
+<div class="screen" id="s-login">
+<div class="card">
+  <div class="card-glow"></div>
+  <button class="back" onclick="go('s-home')">← Back</button>
+  <div class="stitle"><div class="stitle-icon">⬡</div>Login</div>
+
+  <div class="fgroup">
+    <label class="flabel">Email Address</label>
+    <input type="email" id="li-email" placeholder="registered email"/>
+  </div>
+  <div class="fgroup">
+    <label class="flabel">Unique User ID</label>
+    <input type="text" id="li-uid" placeholder="your_unique_id"/>
+  </div>
+  <button class="btn btn-cyan" onclick="doLoginInit()">Verify →</button>
+  <div class="loader" id="ld-li-init"><div class="spin"></div>Fetching challenge…</div>
+  <div class="msg-box" id="msg-li-init"></div>
+  <p class="hint">Forgot your key? <a onclick="go('s-recovery-init')">Recover here</a></p>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN: LOGIN — Step 2: Challenge-Response
+══════════════════════════════════════════════════ -->
+<div class="screen" id="s-login-challenge">
+<div class="card">
+  <div class="card-glow"></div>
+  <div class="stitle"><div class="stitle-icon">🔓</div>Authenticate</div>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:20px">
+    Server sent an encrypted challenge. Your stored private key will decrypt it automatically.
+  </p>
+  <div class="fgroup">
+    <label class="flabel">Challenge Status</label>
+    <div style="padding:12px 16px;background:rgba(79,70,229,.05);border:1px solid rgba(79,70,229,.15);border-radius:10px;font-size:12px;color:var(--cyan);font-family:monospace" id="challenge-status">
+      Waiting to decrypt…
+    </div>
+  </div>
+  <button class="btn btn-cyan" id="btn-challenge" onclick="doLoginChallenge()">Decrypt & Verify →</button>
+  <div class="loader" id="ld-li-chal"><div class="spin"></div>Decrypting challenge with private key…</div>
+  <div class="msg-box" id="msg-li-chal"></div>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN: DASHBOARD
+══════════════════════════════════════════════════ -->
+<div class="screen" id="s-dashboard">
+<div class="card">
+  <div class="card-glow"></div>
+  <div class="dash-header">
+    <div class="dash-avatar">👤</div>
+    <div class="dash-uid" id="dash-uid">USER_ID</div>
+    <div class="dash-email" id="dash-email">email@example.com</div>
+  </div>
+
+  <div class="dash-cards">
+    <div class="dash-card">
+      <div class="dash-card-icon">🔑</div>
+      <div class="dash-card-label">Private Key</div>
+      <div class="dash-card-val">Stored ✓</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-card-icon">🌐</div>
+      <div class="dash-card-label">IPFS Shards</div>
+      <div class="dash-card-val">5 / 5 ✓</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-card-icon">🛡</div>
+      <div class="dash-card-label">Encryption</div>
+      <div class="dash-card-val">AES-256 ✓</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-card-icon">✉</div>
+      <div class="dash-card-label">Recovery</div>
+      <div class="dash-card-val">Ready ✓</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+  <button class="btn btn-outline" onclick="doLogout()">← Logout</button>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN: RECOVERY — Step 1: Email + User ID
+══════════════════════════════════════════════════ -->
+<div class="screen" id="s-recovery-init">
+<div class="card">
+  <div class="card-glow"></div>
+  <button class="back" onclick="go('s-home')">← Back</button>
+  <div class="stitle"><div class="stitle-icon">🛡</div>Key Recovery</div>
+
+  <div class="fgroup">
+    <label class="flabel">Email Address</label>
+    <input type="email" id="rec-email" placeholder="registered email"/>
+  </div>
+  <div class="fgroup">
+    <label class="flabel">Unique User ID</label>
+    <input type="text" id="rec-uid" placeholder="your_unique_id"/>
+  </div>
+  <button class="btn btn-violet" onclick="doRecoveryInit()">Send Recovery OTP →</button>
+  <div class="loader" id="ld-rec-init"><div class="spin"></div>Sending OTP…</div>
+  <div class="msg-box" id="msg-rec-init"></div>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN: RECOVERY — Step 2: OTP + Password
+══════════════════════════════════════════════════ -->
+<div class="screen" id="s-recovery-verify">
+<div class="card">
+  <div class="card-glow"></div>
+  <div class="stitle"><div class="stitle-icon">🔓</div>Restore Key</div>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:20px">Enter OTP from email and your password to recover private key.</p>
+
+  <div class="fgroup">
+    <label class="flabel">OTP Code</label>
+    <input type="text" id="rec-otp" placeholder="6-digit OTP" maxlength="6"/>
+  </div>
+  <div class="fgroup">
+    <label class="flabel">Password (to derive AES keys)</label>
+    <input type="password" id="rec-pass" placeholder="your password"/>
+  </div>
+  <button class="btn btn-green" onclick="doRecover()">Recover Private Key 🔑</button>
+  <div class="loader" id="ld-rec-verify"><div class="spin"></div><span id="rec-status">Fetching encrypted CIDs…</span></div>
+  <div class="msg-box" id="msg-rec-verify"></div>
+
+  <div id="rec-result" style="display:none">
+    <div class="divider"></div>
+    <label class="flabel" style="display:block;margin-bottom:8px">Recovered Private Key</label>
+    <div class="rec-key" id="rec-key-val"></div>
+    <div class="status ok" style="margin-top:8px">✓ Private key restored to device</div>
+    <div class="divider"></div>
+    <button class="btn btn-cyan" onclick="go('s-home')">← Back to Home</button>
+  </div>
+</div>
+</div>
+
+</div><!-- /app -->
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════
+const S = {
+  userId: null, email: null, uid: null,
+  challengeEnc: null,
+};
+
+// ═══════════════════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════════════════
+function go(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  UI HELPERS
+// ═══════════════════════════════════════════════════════════
+function msg(id, text, type = 'info') {
+  document.getElementById(id).innerHTML = text
+    ? `<div class="status ${type}">${text}</div>` : '';
+}
+function loader(id, show, text) {
+  const el = document.getElementById(id);
+  el.classList.toggle('show', show);
+  if (text) {
+    const span = el.querySelector('span');
+    if (span) span.textContent = text;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  API HELPER
+// ═══════════════════════════════════════════════════════════
+async function api(path, body) {
+  const r = await fetch(`/api${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return r.json();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INDEXED DB — store/retrieve private key
+// ═══════════════════════════════════════════════════════════
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open('PasskeyRecoveryDB', 1);
+    req.onupgradeneeded = e => {
+      e.target.result.createObjectStore('keys');
+    };
+    req.onsuccess = e => res(e.target.result);
+    req.onerror   = e => rej(e.target.error);
+  });
+}
+
+async function storePrivateKey(userId, cryptoKey) {
+  const db  = await openDB();
+  const tx  = db.transaction('keys', 'readwrite');
+  tx.objectStore('keys').put(cryptoKey, `pk_${userId}`);
+  return new Promise((res, rej) => {
+    tx.oncomplete = res;
+    tx.onerror    = rej;
+  });
+}
+
+async function getPrivateKey(userId) {
+  const db  = await openDB();
+  const tx  = db.transaction('keys', 'readonly');
+  return new Promise((res, rej) => {
+    const req = tx.objectStore('keys').get(`pk_${userId}`);
+    req.onsuccess = () => res(req.result);
+    req.onerror   = () => rej(req.error);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  WEBCRYPTO HELPERS
+// ═══════════════════════════════════════════════════════════
+async function generateRSAKeyPair() {
+  return window.crypto.subtle.generateKey(
+    {
+      name: 'RSA-OAEP',
+      modulusLength: 2048,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: 'SHA-256',
+    },
+    true,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function exportPublicKeyPEM(cryptoKey) {
+  const exported = await window.crypto.subtle.exportKey('spki', cryptoKey);
+  const bytes    = new Uint8Array(exported);
+  let binary     = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  const b64 = window.btoa(binary);
+  const lines = b64.match(/.{1,64}/g).join('\n');
+  return `-----BEGIN PUBLIC KEY-----\n${lines}\n-----END PUBLIC KEY-----`;
+}
+
+async function exportPrivateKeyPEM(cryptoKey) {
+  const exported = await window.crypto.subtle.exportKey('pkcs8', cryptoKey);
+  const bytes    = new Uint8Array(exported);
+  let binary     = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  const b64 = window.btoa(binary);
+  const lines = b64.match(/.{1,64}/g).join('\n');
+  return `-----BEGIN PRIVATE KEY-----\n${lines}\n-----END PRIVATE KEY-----`;
+}
+
+async function importPrivateKeyFromPEM(pem) {
+  const pemContents = pem
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace(/\n/g, '')
+    .replace(/\r/g, '')
+    .trim();
+  
+  const binary = window.atob(pemContents);
+  const bytes  = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  
+  return window.crypto.subtle.importKey(
+    'pkcs8',
+    bytes.buffer,
+    { name: 'RSA-OAEP', hash: 'SHA-256' },
+    false,
+    ['decrypt']
+  );
+}
+
+async function deriveAESKey(password, saltHex) {
+  const enc      = new TextEncoder();
+  const keyMat   = await window.crypto.subtle.importKey(
+    'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
+  );
+  const saltBuf  = hexToBytes(saltHex);
+  return window.crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: saltBuf, iterations: 310000, hash: 'SHA-512' },
+    keyMat,
+    { name: 'AES-GCM', length: 256 },
+    false, ['encrypt', 'decrypt']
+  );
+}
+
+async function aesEncrypt(plaintext, cryptoKey) {
+  const iv  = window.crypto.getRandomValues(new Uint8Array(12));
+  const enc = new TextEncoder().encode(plaintext);
+  const ct  = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, enc);
+  return bytesToHex(iv) + ':' + bytesToHex(new Uint8Array(ct));
+}
+
+async function aesDecrypt(ciphertext, cryptoKey) {
+  const parts  = ciphertext.split(':');
+  const ivHex  = parts[0];
+  const dataHex = parts.slice(1).join(':');
+
+  const tagHex      = dataHex.slice(-32);
+  const ctHex       = dataHex.slice(0, -32);
+
+  const iv      = hexToBytes(ivHex);
+  const tag     = hexToBytes(tagHex);
+  const ct      = hexToBytes(ctHex);
+
+  const ctWithTag = new Uint8Array(ct.length + tag.length);
+  ctWithTag.set(ct);
+  ctWithTag.set(tag, ct.length);
+
+  const pt = await window.crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    cryptoKey,
+    ctWithTag
+  );
+  return new TextDecoder().decode(pt);
+}
+
+async function rsaDecrypt(b64Ciphertext, privateKey) {
+  try {
+    const clean  = b64Ciphertext.replace(/\s/g, '');
+    const binary = window.atob(clean);
+    const bytes  = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const pt = await window.crypto.subtle.decrypt(
+      { name: 'RSA-OAEP' },
+      privateKey,
+      bytes.buffer
+    );
+    return new TextDecoder().decode(pt);
+  } catch(err) {
+    console.log('RSA Decrypt error:', err.message);
+    throw err;
+  }
+}
+
+function shamirSplit(secret, shares, threshold) {
+  const bytes = new TextEncoder().encode(secret);
+  const result = Array.from({ length: shares }, () => []);
+  for (const byte of bytes) {
+    const coeffs = [byte];
+    const rnd = crypto.getRandomValues(new Uint8Array(threshold - 1));
+    for (let i = 1; i < threshold; i++) coeffs.push(rnd[i - 1]);
+    for (let x = 1; x <= shares; x++) {
+      let y = 0, xpow = 1;
+      for (const c of coeffs) { y = gfAdd(y, gfMul(c, xpow)); xpow = gfMul(xpow, x); }
+      result[x - 1].push(y);
+    }
+  }
+  return result.map((share, i) => ({ x: i + 1, y: share }));
+}
+
+function shamirCombine(shares) {
+  const len    = shares[0].y.length;
+  const result = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    const pts = shares.map(s => ({ x: s.x, y: s.y[i] }));
+    result[i] = lagrange(pts);
+  }
+  return new TextDecoder().decode(result);
+}
+
+function lagrange(pts) {
+  let secret = 0;
+  for (let i = 0; i < pts.length; i++) {
+    let num = pts[i].y, den = 1;
+    for (let j = 0; j < pts.length; j++) {
+      if (i === j) continue;
+      num = gfMul(num, pts[j].x);
+      den = gfMul(den, gfAdd(pts[i].x, pts[j].x));
+    }
+    secret = gfAdd(secret, gfMul(num, gfInv(den)));
+  }
+  return secret;
+}
+
+function gfAdd(a, b) { return a ^ b; }
+function gfMul(a, b) {
+  let p = 0;
+  for (let i = 0; i < 8; i++) {
+    if (b & 1) p ^= a;
+    const hb = a & 0x80;
+    a = (a << 1) & 0xFF;
+    if (hb) a ^= 0x1b;
+    b >>= 1;
+  }
+  return p;
+}
+function gfInv(a) {
+  let r = 1;
+  for (let i = 0; i < 254; i++) r = gfMul(r, a);
+  return r;
+}
+
+function bytesToHex(bytes) { return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join(''); }
+function hexToBytes(hex)   { return new Uint8Array(hex.match(/.{2}/g).map(b => parseInt(b, 16))); }
+
+// ── Reed-Solomon-style XOR parity + fault-tolerant reconstruction ──
+function xorParity(shares) {
+  const len = shares[0].y.length, y = new Array(len).fill(0);
+  for (const sh of shares) for (let i = 0; i < len; i++) y[i] ^= sh.y[i];
+  return { x: 0, parity: true, y };
+}
+function combinations(arr, k) {
+  const out = [];
+  (function rec(start, cur) {
+    if (cur.length === k) return out.push(cur.slice());
+    for (let i = start; i < arr.length; i++) { cur.push(arr[i]); rec(i + 1, cur); cur.pop(); }
+  })(0, []);
+  return out;
+}
+// Tries every 3-share combination and accepts the first that yields a valid PKCS#8 key,
+// so a bad/corrupted share is skipped instead of breaking recovery.
+async function reconstructKey(shares) {
+  const data = shares.filter(s => !s.parity), par = shares.find(s => s.parity);
+  let warn = null;
+  if (par && data.length === 5) {
+    const chk = xorParity(data);
+    if (chk.y.some((v, i) => v !== par.y[i])) warn = 'Parity mismatch: a fragment is corrupted; selecting a valid subset.';
+  }
+  if (data.length < 3) throw new Error(`Only ${data.length} valid fragment(s) available; 3 required.`);
+  for (const combo of combinations(data, 3)) {
+    try {
+      const pem = shamirCombine(combo);
+      if (!pem.startsWith('-----BEGIN PRIVATE KEY-----')) continue;
+      await importPrivateKeyFromPEM(pem);
+      return { pem, warn };
+    } catch (_) {}
+  }
+  throw new Error('Could not reconstruct a valid key from the available fragments.');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SIGNUP FLOW
+// ═══════════════════════════════════════════════════════════
+async function doSignupInit() {
+  const email = document.getElementById('su-email').value.trim();
+  if (!email) return msg('msg-su-init','⚠ Enter email','err');
+  loader('ld-su-init', true);
+  const data = await api('/auth/signup/init', { email });
+  loader('ld-su-init', false);
+  if (data.error) return msg('msg-su-init', data.error, 'err');
+  S.userId = data.userId;
+  S.email  = email;
+  msg('msg-su-init', '✉ OTP sent!', 'ok');
+  setTimeout(() => go('s-signup-otp'), 800);
+}
+
+async function doSignupVerifyOTP() {
+  const otp = document.getElementById('su-otp').value.trim();
+  if (!otp) return msg('msg-su-otp','⚠ Enter OTP','err');
+  loader('ld-su-otp', true);
+  const data = await api('/auth/signup/verify-otp', { userId: S.userId, otp });
+  loader('ld-su-otp', false);
+  if (data.error) return msg('msg-su-otp', data.error, 'err');
+  msg('msg-su-otp','✓ Email verified!','ok');
+  setTimeout(() => go('s-signup-setup'), 800);
+}
+
+async function doSignupComplete() {
+  const uid   = document.getElementById('su-uid').value.trim();
+  const pass  = document.getElementById('su-pass').value;
+  const pass2 = document.getElementById('su-pass2').value;
+  if (!uid || !pass) return msg('msg-su-setup','⚠ Fill all fields','err');
+  if (pass !== pass2) return msg('msg-su-setup','⚠ Passwords do not match','err');
+
+  loader('ld-su-setup', true);
+  const statusEl = document.getElementById('su-status');
+
+  try {
+    statusEl.textContent = 'Generating RSA-2048 keypair…';
+    const keyPair = await generateRSAKeyPair();
+
+    statusEl.textContent = 'Exporting keys…';
+    const publicKeyPEM  = await exportPublicKeyPEM(keyPair.publicKey);
+    const privateKeyPEM = await exportPrivateKeyPEM(keyPair.privateKey);
+
+    statusEl.textContent = 'Storing private key in device (IndexedDB)…';
+    const privCryptoKey = await importPrivateKeyFromPEM(privateKeyPEM);
+    await storePrivateKey(S.userId, privCryptoKey);
+
+    statusEl.textContent = 'Registering with server…';
+    const regData = await api('/auth/signup/complete', {
+      userId: S.userId, uniqueId: uid, publicKey: publicKeyPEM,
+    });
+    if (regData.error) throw new Error(regData.error);
+
+    const { salt1, salt2 } = regData;
+
+    statusEl.textContent = 'Deriving AES keys from password…';
+    const aesKey1 = await deriveAESKey(pass, salt1);
+    const aesKey2 = await deriveAESKey(pass, salt2);
+
+    statusEl.textContent = 'Splitting private key (Shamir SSS + Reed-Solomon)…';
+    const shares = shamirSplit(privateKeyPEM, 5, 3);
+    const allShares = [...shares, xorParity(shares)];   // 5 Shamir shares + 1 XOR parity
+    const encShares = await Promise.all(
+      allShares.map(s => aesEncrypt(JSON.stringify(s), aesKey1))
+    );
+
+    statusEl.textContent = 'Uploading encrypted fragments to IPFS…';
+    const cids = await Promise.all(encShares.map(async (encShare, i) => {
+      const data = await api('/passkey/upload-fragment', {
+        userId: S.userId, index: i + 1, fragment: encShare,
+      });
+      if (!data.cid) throw new Error(data.error || `IPFS upload failed for fragment ${i+1}`);
+      return data.cid;
+    }));
+
+    statusEl.textContent = 'Encrypting CIDs with Key2…';
+    const encCIDs = await Promise.all(cids.map(cid => aesEncrypt(cid, aesKey2)));
+
+    statusEl.textContent = 'Storing encrypted CIDs in server…';
+    const storeData = await api('/passkey/store-cids', {
+      userId: S.userId, encryptedCIDs: encCIDs,
+    });
+    if (storeData.error) throw new Error(storeData.error);
+
+    loader('ld-su-setup', false);
+
+    S.uid = uid;
+    document.getElementById('done-frags').innerHTML = [
+      `<div class="frag-card"><span class="frag-num">PUBLIC KEY</span><span class="frag-val">Stored on server ✓</span></div>`,
+      `<div class="frag-card"><span class="frag-num">PRIVATE KEY</span><span class="frag-val">Stored in device (IndexedDB) ✓</span></div>`,
+      ...cids.map((c,i) =>
+        `<div class="frag-card"><span class="frag-num">${i === 5 ? 'PARITY' : 'FRAG ' + (i+1)}</span><span class="frag-val">AES Encrypted → IPFS → CID encrypted in server ✓</span></div>`
+      ),
+    ].join('');
+
+    go('s-signup-done');
+
+  } catch (err) {
+    loader('ld-su-setup', false);
+    msg('msg-su-setup', err.message || 'Error during setup', 'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  LOGIN FLOW
+// ═══════════════════════════════════════════════════════════
+async function doLoginInit() {
+  const email = document.getElementById('li-email').value.trim();
+  const uid   = document.getElementById('li-uid').value.trim();
+  if (!email || !uid) return msg('msg-li-init','⚠ Fill all fields','err');
+
+  loader('ld-li-init', true);
+  const data = await api('/auth/login/init', { email, uniqueId: uid });
+  loader('ld-li-init', false);
+
+  if (data.error) return msg('msg-li-init', data.error, 'err');
+
+  S.userId       = data.userId;
+  S.email        = email;
+  S.uid          = uid;
+  S.challengeEnc = data.challengeCipher;
+
+  document.getElementById('challenge-status').textContent =
+    'Encrypted challenge received. Ready to decrypt with your private key.';
+
+  go('s-login-challenge');
+}
+
+async function doLoginChallenge() {
+  loader('ld-li-chal', true);
+  try {
+    const privateKey = await getPrivateKey(S.userId);
+    if (!privateKey) throw new Error('Private key not found on this device. Use Recovery.');
+
+    const decrypted = await rsaDecrypt(S.challengeEnc, privateKey);
+
+    const data = await api('/auth/login/verify', {
+      userId: S.userId, decryptedChallenge: decrypted,
+    });
+
+    loader('ld-li-chal', false);
+    if (data.error) return msg('msg-li-chal', data.error, 'err');
+
+    document.getElementById('dash-uid').textContent   = S.uid;
+    document.getElementById('dash-email').textContent = S.email;
+    go('s-dashboard');
+
+  } catch (err) {
+    loader('ld-li-chal', false);
+    msg('msg-li-chal', err.message || 'Authentication failed', 'err');
+  }
+}
+
+function doLogout() {
+  S.userId = null; S.email = null; S.uid = null; S.challengeEnc = null;
+  go('s-home');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RECOVERY FLOW
+// ═══════════════════════════════════════════════════════════
+async function doRecoveryInit() {
+  const email = document.getElementById('rec-email').value.trim();
+  const uid   = document.getElementById('rec-uid').value.trim();
+  if (!email || !uid) return msg('msg-rec-init','⚠ Fill all fields','err');
+
+  loader('ld-rec-init', true);
+  const data = await api('/passkey/request-recovery', { email, uniqueId: uid });
+  loader('ld-rec-init', false);
+
+  if (data.error) return msg('msg-rec-init', data.error, 'err');
+  S.userId = data.userId;
+  S.email  = email;
+  S.uid    = uid;
+  msg('msg-rec-init','✉ OTP sent to email','ok');
+  setTimeout(() => go('s-recovery-verify'), 800);
+}
+
+async function doRecover() {
+  const otp  = document.getElementById('rec-otp').value.trim();
+  const pass = document.getElementById('rec-pass').value;
+  if (!otp || !pass) return msg('msg-rec-verify','⚠ Fill all fields','err');
+
+  loader('ld-rec-verify', true);
+  const statusEl = document.getElementById('rec-status');
+
+  try {
+    statusEl.textContent = 'Verifying OTP…';
+    const data = await api('/passkey/get-encrypted-cids', { userId: S.userId, otp });
+    if (data.error) throw new Error(data.error);
+
+    const { salt1, salt2, encryptedCIDs } = data;
+
+    statusEl.textContent = 'Deriving AES keys from password…';
+    const aesKey1 = await deriveAESKey(pass, salt1);
+    const aesKey2 = await deriveAESKey(pass, salt2);
+
+    statusEl.textContent = 'Decrypting CIDs…';
+    const cids = await Promise.all(encryptedCIDs.map(ec => aesDecrypt(ec, aesKey2)));
+
+    statusEl.textContent = 'Fetching fragments from IPFS…';
+    const shares = (await Promise.all(cids.map(async (cid) => {
+      try {
+        const res = await fetch(`https://gateway.pinata.cloud/ipfs/${cid}`);
+        const j   = await res.json();
+        return JSON.parse(await aesDecrypt(j.fragment, aesKey1));  // GCM tag rejects tampered data
+      } catch (_) { return null; }                                  // missing/corrupt -> skipped
+    }))).filter(Boolean);
+
+    statusEl.textContent = `Reconstructing from ${shares.length} valid fragments…`;
+    const { pem: privateKeyPEM, warn } = await reconstructKey(shares);
+    if (warn) msg('msg-rec-verify', '⚠ ' + warn, 'info');
+
+    statusEl.textContent = 'Restoring key to device…';
+    const privCryptoKey = await importPrivateKeyFromPEM(privateKeyPEM);
+    await storePrivateKey(S.userId, privCryptoKey);
+
+    loader('ld-rec-verify', false);
+
+    document.getElementById('rec-key-val').textContent = privateKeyPEM;
+    document.getElementById('rec-result').style.display = 'block';
+  } catch (err) {
+    loader('ld-rec-verify', false);
+    msg('msg-rec-verify', err.message || 'Recovery failed', 'err');
+  }
+}
+</script>
+</body>
+</html>
